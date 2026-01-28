@@ -1,0 +1,413 @@
+using System;
+using System.Collections;
+using DG.Tweening;
+using Unity.Cinemachine;
+using UnityEngine;
+using UnityEngine.UI;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
+
+public class PlayerController : MonoBehaviour
+{
+    public static PlayerController instance;
+    [Header("Movement Settings")]
+    public float moveSpeed = 5f;
+    public float rotationSpeed = 10f;
+    public float jumpForce = 6f;
+    public float gravity = -20f;
+    public float climbSpeed = 3f;
+    public float climbCheckDistance = 1f;
+    public LayerMask wallLayer;
+
+    [Header("References")]
+    public FloatingJoystick joystick;
+    public Animator animator;
+
+    private CharacterController controller;
+    private Shooting shooting;
+    private Vector3 velocity;
+    private Vector3 moveDir;
+    private bool isJumping;
+    private bool isMoving;
+    private bool isClimbing;
+    private bool isClimbingUp;
+    private bool isSliding;
+    private float buildingTopY;
+
+    // Animation hashes
+    private readonly int idleHash = Animator.StringToHash("Idle");
+    private readonly int runHash = Animator.StringToHash("Running");
+    private readonly int jumpHash = Animator.StringToHash("Jump");
+    private readonly int climbHash = Animator.StringToHash("Climb");
+    private readonly int climbUpHash = Animator.StringToHash("ClimbUp");
+    private readonly int deathHash = Animator.StringToHash("Death");
+    private readonly int winHash = Animator.StringToHash("Win");
+    private readonly int aimIdleHash = Animator.StringToHash("AimIdle");
+    private readonly int aimRunHash = Animator.StringToHash("AimRun");
+    private readonly int slideHash = Animator.StringToHash("Slide");
+    private readonly int swingHash = Animator.StringToHash("Swing");
+    private readonly int fallHash = Animator.StringToHash("Fall");
+    private readonly int driveHash = Animator.StringToHash("Drive");
+    private int currentState;
+    private int currenActiveLayer;
+
+    [SerializeField] private Transform cam;
+    Vector3 camForward, camRight, move;
+    [SerializeField] private Material playerMaterial;
+    //[SerializeField] SkinnedMeshRenderer skinnedMeshRenderer;
+    private string floatPropertyName = "_EmissiveIntensity";
+    [SerializeField] private Animation damageEffectAnim;
+    private float currentHealth;
+    public float maxHealth;
+    [SerializeField] private Image fillBar;
+    [SerializeField] private GameObject healthBar;
+    [SerializeField] private Volume volume;
+
+    private void Awake()
+    {
+        instance = this;
+    }
+
+    void Start()
+    {
+        controller = GetComponent<CharacterController>();
+        shooting = GetComponent<Shooting>();
+        currentState = idleHash;
+        animator.Play(idleHash);
+        playerMaterial.SetFloat(floatPropertyName,0f);
+        currentHealth =  maxHealth;
+        UpdateHealthUi();
+        //playerMaterial = skinnedMeshRenderer.material;
+    }
+
+    [SerializeField] private GameObject waterSprayGun;
+    void Update()
+    {
+        /*if (Input.GetKeyDown(KeyCode.W))
+        {
+            die = true;
+            PlayAnim(winHash);
+            CameraShake.instance.ChangeFov(40);
+            if (!CameraShake.instance.hook1)
+            {
+                CameraShake.instance.SwitchCamera(3);
+            }
+
+            if (waterSprayGun != null)
+            {
+                waterSprayGun.SetActive(false);
+            }
+        }*/
+        if (Input.GetKeyDown(KeyCode.W))
+        {
+            Damage(100);
+        }
+        DetectClimbable();
+        HandleMovement();
+        HandleJumpAndGravity();
+        HandleAnimation();
+    }
+
+    // --------------------------------------
+    void DetectClimbable()
+    {
+        if (isClimbingUp || die) return; // prevent detection while climb-up animation is playing
+
+        // Forward ray to detect climbable wall
+        if (Physics.Raycast(transform.position, transform.forward, out RaycastHit hit, climbCheckDistance, wallLayer))
+        {
+            isClimbing = true;
+            velocity = Vector3.zero;
+            buildingTopY = hit.collider.bounds.max.y;
+            // Check if there's no wall above (i.e., top reached)
+            if (!isClimbingUp && !Physics.Raycast(transform.position + Vector3.up * 1.75f, transform.forward, 0.5f))
+            {
+                TriggerClimbUp();
+            }
+            return;
+        }
+        isClimbing = false;
+    }
+
+    [Header("Zipper")]
+    public float zipSpeed;
+    public bool zipLiner;
+    [SerializeField] private ParticleSystem speedLines;
+    public void ZipLiner(Vector3 zipStartPos, Vector3 middlePos, Vector3 zipendPos)
+    {
+        zipLiner = true;
+        PlayAnim(swingHash);
+        transform.DORotateQuaternion(Quaternion.Euler(0,90,0), .2f);
+        speedLines.Play();
+        float Distance1 = Vector3.Distance(zipStartPos, middlePos);
+        float Distance2 = Vector3.Distance(zipendPos, middlePos);
+        Sequence sequence =  DOTween.Sequence();
+        sequence.Append(transform.DOMove(zipStartPos, 0.2f).SetEase(Ease.Linear));
+        sequence.Append(transform.DOMove(middlePos, Distance1/zipSpeed).SetEase(Ease.Linear));
+        sequence.Append(transform.DOMove(zipendPos, Distance2/zipSpeed).SetEase(Ease.Linear));
+        sequence.OnComplete(() =>
+        {
+            zipLiner = false;
+            speedLines.Stop();
+            CameraShake.instance.SwitchCamera(2);
+        });
+    }
+
+    public void SwingOnCrane(Vector3 pos)
+    {
+        zipLiner = true;
+        healthBar.SetActive(false);
+        PlayAnim(swingHash);
+        transform.DOMove(pos, 0.2f);
+    }
+
+    [SerializeField] private Transform boatPos;
+    [SerializeField] private Jetski jetski;
+    public void DropPlayerToBoat()
+    {
+        transform.parent = null;
+        PlayAnim(fallHash);
+        controller.enabled = false;
+        transform.DORotateQuaternion(Quaternion.Euler(0,90,0), 0.25f);
+        transform.DOMove(boatPos.position,2f).SetEase(Ease.Linear).OnComplete(() =>
+        {
+            PlayAnim(driveHash);
+            transform.parent = jetski.transform;
+            jetski.enabled = true;
+        });
+    }
+    
+    void TriggerClimbUp()
+    {
+        isClimbing = false;
+        isClimbingUp = true;
+        velocity = Vector3.zero;
+        Vector3 toPos = new Vector3(transform.position.x, buildingTopY, transform.position.z);
+        transform.DOJump(toPos + transform.forward * 0.5f, 0.3f, 1, 0.5f).SetEase(Ease.Linear).OnComplete(() =>
+        {
+            isClimbingUp = false;
+        });
+        PlayAnim(climbUpHash);
+    }
+
+    // --------------------------------------
+    void HandleMovement()
+    {
+        if (isClimbingUp || die || zipLiner) return; // block input
+
+        moveDir = new Vector3(joystick.Horizontal, 0f, joystick.Vertical).normalized;
+        camForward = cam.forward;
+        camForward.y = 0f;
+        camForward.Normalize();
+ 
+        camRight = cam.right;
+        camRight.y = 0f;
+        camRight.Normalize();
+ 
+        //Find Movement Direction
+        move = camForward * moveDir.z + camRight * moveDir.x;
+        move = move.normalized;
+        isMoving = move.magnitude > 0.1f;
+
+        if (isClimbing)
+        {
+            float verticalInput = joystick.Vertical;
+            if (verticalInput > 0.1f)
+            {
+                Vector3 climbMove = Vector3.up * climbSpeed * Time.deltaTime;
+                controller.Move(climbMove);
+            }
+            return;
+        }
+
+        if (isMoving)
+        {
+            if (Input.GetKeyDown(KeyCode.C))
+            {
+                // slide
+                if(slideCorutine != null) return;
+                isSliding = true;
+                slideCorutine = StartCoroutine(DisableSlide());
+            }
+            controller.Move(move * moveSpeed * Time.deltaTime);
+
+            Quaternion targetRotation = Quaternion.LookRotation(move, Vector3.up);
+            transform.rotation = Quaternion.RotateTowards(
+                transform.rotation,
+                targetRotation,
+                rotationSpeed * Time.deltaTime * 100f
+            );
+        }
+    }
+
+    private Coroutine slideCorutine;
+    IEnumerator DisableSlide()
+    {
+        yield return new WaitForSeconds(1f);
+        isSliding = false;
+        slideCorutine = null;
+    }
+
+    // --------------------------------------
+    void HandleJumpAndGravity()
+    {
+        if (isClimbing || isClimbingUp || zipLiner) return; // disable gravity during climb or climb-up
+
+        bool isGrounded = controller.isGrounded || (velocity.y < 0 && Physics.Raycast(transform.position, Vector3.down, 0.2f));
+
+        if (Input.GetKeyDown(KeyCode.Space) && isGrounded && !die)
+        {
+            velocity.y = jumpForce;
+            isJumping = true;
+            PlayAnim(jumpHash);
+        }
+
+        if (!isGrounded)
+        {
+            velocity.y += gravity * Time.deltaTime;
+        }
+        else if (velocity.y < 0)
+        {
+            velocity.y = -2f;
+            isJumping = false;
+        }
+
+        controller.Move(velocity * Time.deltaTime);
+    }
+
+    // --------------------------------------
+    void HandleAnimation()
+    {
+        if (die)
+        {
+            return;
+        }
+
+        if (zipLiner)
+        {
+            return;
+        }
+        
+        if (isClimbingUp)
+        {
+            PlayAnim(climbUpHash);
+            return;
+        }
+
+        if (isClimbing)
+        {
+            PlayAnim(climbHash);
+            return;
+        }
+
+        if (!isJumping)
+        {
+            if (shooting.hasRocketLauncher)
+            {
+                if (isMoving)
+                    PlayAnim(aimRunHash);
+                else
+                    PlayAnim(aimIdleHash);
+            }
+            else
+            {
+                if(isMoving)
+                {
+                    if (isSliding)
+                    {
+                        PlayAnim(slideHash);
+                    }
+                    else
+                    {
+                        PlayAnim(runHash);
+                    }
+                }
+                else
+                {
+                    PlayAnim(idleHash);
+                }
+            }
+        }
+    }
+
+    // --------------------------------------
+    void PlayAnim(int targetHash)
+    {
+        if (currentState == targetHash) return;
+
+        animator.CrossFadeInFixedTime(targetHash, 0.25f);
+        currentState = targetHash;
+    }
+
+     // Assign the Global Volume Profile from Project Settings
+    private ColorAdjustments colorAdjustments;
+    private bool die;
+    public void Damage(float damage)
+    {
+        //return;
+        if(die == true) return;
+        DOTween.Kill(playerMaterial); // Prevent stacking animations
+        damageEffectAnim.Play();
+        currentHealth -= damage;
+        UpdateHealthUi();
+        
+        if (currentHealth <= 0)
+        {
+            print("Die");
+            gameObject.tag = "Untagged";
+            die = true;
+            PlayAnim(deathHash);
+            GetComponent<Shooting>().enabled = false;
+            if (volume != null && volume.profile.TryGet(out colorAdjustments))
+            {
+                colorAdjustments.saturation.value = -60f; // Initial value
+            }
+            else
+            {
+                Debug.LogWarning("Color Adjustments not found in the profile!");
+            }
+
+            if (CameraShake.instance.hook1)
+            {
+                CameraShake.instance.ChangeFov(40);
+            }
+            else
+            {
+                CameraShake.instance.ChangeFov(40);
+            }
+            
+            Time.timeScale = 0.35f;
+        }
+        playerMaterial.DOFloat(1f, floatPropertyName, 0.05f)
+            .OnComplete(() =>
+            {
+                playerMaterial.DOFloat(0f, floatPropertyName, 0.05f);
+            });
+    }
+    
+
+    void UpdateHealthUi()
+    {
+        fillBar.fillAmount = (float) currentHealth / maxHealth;
+        if (currentHealth <= 0)
+        {
+            healthBar.SetActive(false);
+        }
+    }
+
+    public void JumpOutfromTrolley(Vector3 target, bool fromTrolley = false)
+    {
+        this.enabled = false;
+        transform.DOJump(target,1.5f,1,1.25f).SetEase(Ease.Linear).OnComplete(() =>
+        {
+            this.enabled = true;
+            GetComponent<Shooting>().enabled = true;
+            if (fromTrolley)
+            {
+                CameraShake.instance.SwitchCamera(3);
+            }
+        });
+        transform.DORotateQuaternion(Quaternion.Euler(0,90,0), 0.25f);
+        PlayAnim(jumpHash);
+    }
+}
