@@ -7,7 +7,7 @@ public class EnemyActivator : MonoBehaviour
 {
     public static EnemyActivator Instance;
     public List<Group> groups;
-    [SerializeField] float minimumDistanceToActivate;
+    public float minimumDistanceToActivate;
     [SerializeField] private Transform player;
 
     [SerializeField] private Group[] lastGroups;

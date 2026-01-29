@@ -18,13 +18,13 @@ public class Enemy : PoolableObject
     public float climbCheckDistance = 1f;
     public LayerMask wallLayer;
     public LayerMask enemyWallLayer;
-    
+
     public bool isDead;
     public float rollSpeed;
     [SerializeField] Transform childTransform;
     [SerializeField] private Animator animator;
     [SerializeField] private Transform target;
-    
+
     private readonly int idleHash = Animator.StringToHash("Idle");
     private readonly int runHash = Animator.StringToHash("Running");
     private readonly int runHash2 = Animator.StringToHash("Running2");
@@ -48,14 +48,14 @@ public class Enemy : PoolableObject
     private bool canStop;
     public bool isBoss;
     public bool specialEnemy;
-    
+
     private static readonly int BaseColorID = Shader.PropertyToID("_DiffuseColor");
     private static readonly int OutlineColorID = Shader.PropertyToID("_OutlineColor");
     private static readonly int OutlineThicknessID = Shader.PropertyToID("_Outline_Thickness");
 
     private float currenHealth;
     [SerializeField] private float maxHealth;
-    
+
     [SerializeField] private GameObject headFireEffect;
     [SerializeField] private ParticleSystem switchFireEffect;
     void Start()
@@ -69,18 +69,26 @@ public class Enemy : PoolableObject
         finalRunHash = rand == 0 ? runHash : runHash2;
         if (!isBoss)
         {
-            offset = new Vector3(Random.Range(-3,3),0,Random.Range(-1,1));
+            offset = new Vector3(Random.Range(-3, 3), 0, Random.Range(-1, 1));
             moveSpeed = Random.Range(3.5f, 5.5f) * speedMultiplier;
         }
     }
 
     void Update()
     {
-        if(isDead) return;
+        if (isDead) return;
         DetectClimbable();
         HandleMovement();
         HandleJumpAndGravity();
         HandleAnimation();
+    }
+
+    void OnTriggerEnter(Collider other)
+    {
+        if (other.tag == "F")
+        {
+            Dead();
+        }
     }
 
     // --------------------------------------
@@ -88,9 +96,9 @@ public class Enemy : PoolableObject
     {
         if (isClimbingUp) return; // prevent detection while climb-up animation is playing
         int layerMask = (1 << LayerMask.NameToLayer("wall")) | (1 << LayerMask.NameToLayer("enemywall"));
-        
+
         // Forward ray to detect climbable wall
-        if (Physics.Raycast(transform.position, transform.forward, out RaycastHit hit, climbCheckDistance,layerMask))
+        if (Physics.Raycast(transform.position, transform.forward, out RaycastHit hit, climbCheckDistance, layerMask))
         {
             isClimbing = true;
             velocity = Vector3.zero;
@@ -105,7 +113,7 @@ public class Enemy : PoolableObject
 
         isClimbing = false;
     }
-    
+
     void TriggerClimbUp()
     {
         isClimbing = false;
@@ -133,7 +141,7 @@ public class Enemy : PoolableObject
             }
             return;
         }
-        
+
         moveDir = target.position - transform.position + offset;
         canStop = Vector3.Distance(target.position, transform.position) < stoppingDistance;
         if (canStop)
@@ -164,7 +172,7 @@ public class Enemy : PoolableObject
         if (isClimbing || isClimbingUp) return; // disable gravity during climb or climb-up
 
         bool isGrounded = controller.isGrounded || (velocity.y < 0 && Physics.Raycast(transform.position, Vector3.down, 0.2f));
-        
+
         if (!isGrounded)
         {
             velocity.y += gravity * Time.deltaTime;
@@ -218,7 +226,7 @@ public class Enemy : PoolableObject
     {
         currenHealth -= damage;
         //PulseEmission(0.4f,0.05f);
-        hitByCar  = hitbyCar;
+        hitByCar = hitbyCar;
         if (currenHealth <= 0)
         {
             Dead();
@@ -228,25 +236,25 @@ public class Enemy : PoolableObject
 
         if (isBoss || fireZombie)
         {
-            var bloodParticle = ObjectPooling.Instance.Spawn<BloodParticle>(PoolType.yellowBlood,spawnPos);
+            var bloodParticle = ObjectPooling.Instance.Spawn<BloodParticle>(PoolType.yellowBlood, spawnPos);
             bloodParticle.Play(-transform.forward);
         }
         else
         {
-            var bloodParticle = ObjectPooling.Instance.Spawn<BloodParticle>(PoolType.GreenBlood,spawnPos);
+            var bloodParticle = ObjectPooling.Instance.Spawn<BloodParticle>(PoolType.GreenBlood, spawnPos);
             bloodParticle.Play(-transform.forward);
         }
-        
+
     }
-    
+
     [SerializeField] private Image fillBar;
     [SerializeField] private GameObject healthBar;
-    
+
     void UpdateHealthUi()
     {
         if (healthBar != null)
         {
-            fillBar.fillAmount = (float) currenHealth / maxHealth;
+            fillBar.fillAmount = (float)currenHealth / maxHealth;
             if (currenHealth <= 0)
             {
                 healthBar.SetActive(false);
@@ -257,10 +265,10 @@ public class Enemy : PoolableObject
     public void Dead()
     {
         Vector3 spawnPos = transform.position + new Vector3(0, 1.75f, 0);
-         var coin = ObjectPooling.Instance.Spawn<BloodParticle>(PoolType.goldCoin,spawnPos);
-         coin.Play(Vector3.up);
-       // Vector3 floatingTextSpawnPos = CameraShake.instance.cam.WorldToScreenPoint(spawnPos);
-       // FloatingText floatingText = ObjectPooling.Instance.Spawn<FloatingText>(PoolType.ScoreText,floatingTextSpawnPos);
+        var coin = ObjectPooling.Instance.Spawn<BloodParticle>(PoolType.goldCoin, spawnPos);
+        coin.Play(Vector3.up);
+        // Vector3 floatingTextSpawnPos = CameraShake.instance.cam.WorldToScreenPoint(spawnPos);
+        // FloatingText floatingText = ObjectPooling.Instance.Spawn<FloatingText>(PoolType.ScoreText,floatingTextSpawnPos);
         //floatingText.ShowText(1);
         if (emissionSeq != null && emissionSeq.IsActive())
         {
@@ -269,7 +277,7 @@ public class Enemy : PoolableObject
 
         if (fireZombie)
         {
-            
+
         }
         else
         {
@@ -283,7 +291,7 @@ public class Enemy : PoolableObject
                 SetPlayerBlackDead(Color.black, Color.red, 0.005f);
             }
         }
-        
+
         GetComponent<Collider>().enabled = false;
         if (controller != null)
         {
@@ -295,9 +303,9 @@ public class Enemy : PoolableObject
         PlayAnim(deathHash);
         if (hitByCar)
         {
-            Vector3 targetDeathPos = transform.position - transform.forward * Random.Range(9,15);
+            Vector3 targetDeathPos = transform.position - transform.forward * Random.Range(9, 15);
             Vector3 randomAxis = Random.onUnitSphere;
-            transform.DOJump(targetDeathPos, Random.Range(2f,3.5f), 1, 1.5f).SetEase(Ease.Linear).OnUpdate(() =>
+            transform.DOJump(targetDeathPos, Random.Range(2f, 3.5f), 1, 1.5f).SetEase(Ease.Linear).OnUpdate(() =>
             {
                 childTransform.Rotate(randomAxis * rollSpeed * Time.deltaTime, Space.Self);
             });
@@ -356,7 +364,7 @@ public class Enemy : PoolableObject
                     pulseRunning = false;
                 });
             });*/
-        
+
         if (emissionSeq != null && emissionSeq.IsActive())
         {
             emissionSeq.Kill();
@@ -390,7 +398,7 @@ public class Enemy : PoolableObject
         targetRenderers[1].sharedMaterial = greyMaterialB;
         targetRenderers[2].sharedMaterial = greyMaterialA;
     }
-    
+
     public void SetPlayerBlackDead(Color baseColor, Color outlineColor, float outlineThickness)
     {
         // Update Base Material (index 0)
@@ -399,7 +407,7 @@ public class Enemy : PoolableObject
         // targetRenderer.SetPropertyBlock(mpb, 0);
 
         // Update Outline Material (index 1)
-        if(isBoss) return;
+        if (isBoss) return;
         //targetRenderer.GetPropertyBlock(mpb, 1);
         mpb.SetColor(OutlineColorID, outlineColor);
         mpb.SetFloat(OutlineThicknessID, outlineThickness);
@@ -423,8 +431,8 @@ public class Enemy : PoolableObject
     public bool fireZombie;
     public void SwitchEnemy()
     {
-        if(switched) return;
-        
+        if (switched) return;
+
         switched = true;
         fireZombie = true;
         headFireEffect.SetActive(true);

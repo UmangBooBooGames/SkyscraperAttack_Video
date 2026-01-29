@@ -74,8 +74,8 @@ public class PlayerController : MonoBehaviour
         shooting = GetComponent<Shooting>();
         currentState = idleHash;
         animator.Play(idleHash);
-        playerMaterial.SetFloat(floatPropertyName,0f);
-        currentHealth =  maxHealth;
+        playerMaterial.SetFloat(floatPropertyName, 0f);
+        currentHealth = maxHealth;
         UpdateHealthUi();
         //playerMaterial = skinnedMeshRenderer.material;
     }
@@ -137,14 +137,14 @@ public class PlayerController : MonoBehaviour
     {
         zipLiner = true;
         PlayAnim(swingHash);
-        transform.DORotateQuaternion(Quaternion.Euler(0,90,0), .2f);
+        transform.DORotateQuaternion(Quaternion.Euler(0, 90, 0), .2f);
         speedLines.Play();
         float Distance1 = Vector3.Distance(zipStartPos, middlePos);
         float Distance2 = Vector3.Distance(zipendPos, middlePos);
-        Sequence sequence =  DOTween.Sequence();
+        Sequence sequence = DOTween.Sequence();
         sequence.Append(transform.DOMove(zipStartPos, 0.2f).SetEase(Ease.Linear));
-        sequence.Append(transform.DOMove(middlePos, Distance1/zipSpeed).SetEase(Ease.Linear));
-        sequence.Append(transform.DOMove(zipendPos, Distance2/zipSpeed).SetEase(Ease.Linear));
+        sequence.Append(transform.DOMove(middlePos, Distance1 / zipSpeed).SetEase(Ease.Linear));
+        sequence.Append(transform.DOMove(zipendPos, Distance2 / zipSpeed).SetEase(Ease.Linear));
         sequence.OnComplete(() =>
         {
             zipLiner = false;
@@ -168,15 +168,15 @@ public class PlayerController : MonoBehaviour
         transform.parent = null;
         PlayAnim(fallHash);
         controller.enabled = false;
-        transform.DORotateQuaternion(Quaternion.Euler(0,90,0), 0.25f);
-        transform.DOMove(boatPos.position,2f).SetEase(Ease.Linear).OnComplete(() =>
+        transform.DORotateQuaternion(Quaternion.Euler(0, 90, 0), 0.25f);
+        transform.DOMove(boatPos.position, 2f).SetEase(Ease.Linear).OnComplete(() =>
         {
             PlayAnim(driveHash);
             transform.parent = jetski.transform;
             jetski.enabled = true;
         });
     }
-    
+
     void TriggerClimbUp()
     {
         isClimbing = false;
@@ -199,11 +199,11 @@ public class PlayerController : MonoBehaviour
         camForward = cam.forward;
         camForward.y = 0f;
         camForward.Normalize();
- 
+
         camRight = cam.right;
         camRight.y = 0f;
         camRight.Normalize();
- 
+
         //Find Movement Direction
         move = camForward * moveDir.z + camRight * moveDir.x;
         move = move.normalized;
@@ -225,7 +225,7 @@ public class PlayerController : MonoBehaviour
             if (Input.GetKeyDown(KeyCode.C))
             {
                 // slide
-                if(slideCorutine != null) return;
+                if (slideCorutine != null) return;
                 isSliding = true;
                 slideCorutine = StartCoroutine(DisableSlide());
             }
@@ -287,7 +287,7 @@ public class PlayerController : MonoBehaviour
         {
             return;
         }
-        
+
         if (isClimbingUp)
         {
             PlayAnim(climbUpHash);
@@ -311,7 +311,7 @@ public class PlayerController : MonoBehaviour
             }
             else
             {
-                if(isMoving)
+                if (isMoving)
                 {
                     if (isSliding)
                     {
@@ -339,18 +339,18 @@ public class PlayerController : MonoBehaviour
         currentState = targetHash;
     }
 
-     // Assign the Global Volume Profile from Project Settings
+    // Assign the Global Volume Profile from Project Settings
     private ColorAdjustments colorAdjustments;
     private bool die;
     public void Damage(float damage)
     {
         //return;
-        if(die == true) return;
+        if (die == true) return;
         DOTween.Kill(playerMaterial); // Prevent stacking animations
         damageEffectAnim.Play();
         currentHealth -= damage;
         UpdateHealthUi();
-        
+
         if (currentHealth <= 0)
         {
             print("Die");
@@ -375,7 +375,7 @@ public class PlayerController : MonoBehaviour
             {
                 CameraShake.instance.ChangeFov(40);
             }
-            
+
             Time.timeScale = 0.35f;
         }
         playerMaterial.DOFloat(1f, floatPropertyName, 0.05f)
@@ -384,11 +384,11 @@ public class PlayerController : MonoBehaviour
                 playerMaterial.DOFloat(0f, floatPropertyName, 0.05f);
             });
     }
-    
+
 
     void UpdateHealthUi()
     {
-        fillBar.fillAmount = (float) currentHealth / maxHealth;
+        fillBar.fillAmount = (float)currentHealth / maxHealth;
         if (currentHealth <= 0)
         {
             healthBar.SetActive(false);
@@ -398,7 +398,7 @@ public class PlayerController : MonoBehaviour
     public void JumpOutfromTrolley(Vector3 target, bool fromTrolley = false)
     {
         this.enabled = false;
-        transform.DOJump(target,1.5f,1,1.25f).SetEase(Ease.Linear).OnComplete(() =>
+        transform.DOJump(target, 1.5f, 1, 1.25f).SetEase(Ease.Linear).OnComplete(() =>
         {
             this.enabled = true;
             GetComponent<Shooting>().enabled = true;
@@ -407,7 +407,48 @@ public class PlayerController : MonoBehaviour
                 CameraShake.instance.SwitchCamera(3);
             }
         });
-        transform.DORotateQuaternion(Quaternion.Euler(0,90,0), 0.25f);
+        transform.DORotateQuaternion(Quaternion.Euler(0, 90, 0), 0.25f);
         PlayAnim(jumpHash);
+    }
+    public void PlayHook(Transform startPoint, Transform endPoint)
+    {
+        PlayAnim(runHash);
+        transform.DOMove(startPoint.position, 0.5f).SetEase(Ease.Linear).OnComplete(() =>
+        {
+            PlayAnim(jumpHash);
+            transform.DOJump(endPoint.position, 15f, 1, 1.5f).SetEase(Ease.Linear).OnComplete(() =>
+            {
+                PlayAnim(idleHash);
+                enabled = true;
+            });
+        });
+    }
+
+    [SerializeField] GameObject auraEffect;
+    public float scaleAmount = 1.2f;   // how much bigger it gets
+    public float duration = 0.3f;      // speed of wobble
+    public int vibrato = 2;            // number of shakes
+    public float elasticity = 0.5f;    // bounciness (0�1)
+    private Vector3 originalScale;
+    public void UpgradePlayer()
+    {
+        transform.DOKill();
+
+        // Reset to original scale before playing
+        transform.localScale = originalScale;
+        auraEffect.SetActive(true);
+        // Apply punch scale (wobble effect)
+        transform.DOPunchScale(
+            new Vector3(scaleAmount, scaleAmount, scaleAmount),
+            duration,
+            vibrato,
+            elasticity
+        ).OnComplete(() =>
+        {
+            // Ensure it snaps back perfectly
+            // skm.materials = new Material[] { matToChange, matToChange };
+            transform.localScale = originalScale + new Vector3(0f, 0f, 0f);
+        });
+        ;
     }
 }

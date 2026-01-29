@@ -2,25 +2,25 @@ using System;
 using UnityEngine;
 using System.Collections.Generic;
 using System.Linq;
-using System.Numerics;
 using UnityEngine.Animations.Rigging;
-using Vector3 = UnityEngine.Vector3;
 
 public class Shooting : MonoBehaviour
 {
-    [SerializeField] private Rig rightHandRig,leftHandRig, spineRig;
+    public Rig rightHandRig, leftHandRig, spineRig;
     [SerializeField] private Transform rightHandTarget, leftHandTarget, centerSpineTarget;
-    [SerializeField] private float aimRange = 15f;
+    public float aimRange = 15f;
     [SerializeField] private LayerMask enemyLayerMask;
     [SerializeField] private float rightOffset, leftOffset, forwardOffset;
     private float currentRightWeight, currentLeftWieght, currentSpineWieght;
-    public Transform rightTarget, leftTarget, centerTarget;
+    private Transform rightTarget, leftTarget, centerTarget;
     [SerializeField] private GunSet[] gunSets;
     private int currentSelectedGunSet;
     public bool hasRocketLauncher;
+    public bool hasgattLauncher;
     [SerializeField] Bullet bulletPrefab;
-    public Camera mainCam; 
-
+    public bool lft;
+    public GameObject effect, upp;
+    public bool sut;
     [Serializable]
     public class GunSet
     {
@@ -42,55 +42,42 @@ public class Shooting : MonoBehaviour
 
     private void Update()
     {
+        if (Input.GetKeyDown(KeyCode.F))
+        {
+            if (!sut)
+            {
+                aimRange = 9;
+                rightOffset = 9;
+                leftOffset = -9;
+                sut = true;
+            }
+            else
+            {
+                aimRange = 5;
+                rightOffset = 5;
+                leftOffset = -5;
+                sut = false;
+            }
+        }
         SwitchGun();
-        
-        if (hasRocketLauncher)
+        if (hasRocketLauncher || hasgattLauncher)
         {
             rightTarget = null;
             leftTarget = null;
-            //DetectCenter();
-            centerTarget.position = transform.position;
-            RotateTowardsMouse();
-            centerSpineTarget.position = centerTarget.position + Vector3.up * 1f + centerTarget.forward * 2.5f;
+            DetectCenter();
             SetSpineWeight();
         }
         else
         {
             DetectRightSide();
-            DetectLeftSide();
+            if (lft)
+            {
+                DetectLeftSide();
+
+            }
             HandelHandAim();
         }
-
-        if (currentSelectedGunSet == 0 || currentSelectedGunSet == 1)
-        {
-            CheckForShoot();
-        }
-        else
-        {
-            
-        }
-    }
-
-    [SerializeField] private float rotationSpeed;
-    void RotateTowardsMouse()
-    {
-        float horizontal = 0f;
-
-        if (Input.GetKey(KeyCode.A))
-        {
-            horizontal = -1f;
-        }
-        else if (Input.GetKey(KeyCode.D))
-        {
-            horizontal = 1f;
-        }
-        else if (Input.GetKey(KeyCode.F))
-        {
-            gunSets[currentSelectedGunSet].Guns[0].StopSpray();
-        }
-        
-        // Rotate around Y axis
-        centerTarget.Rotate(Vector3.up * horizontal * rotationSpeed * Time.deltaTime);
+        CheckForShoot();
     }
 
     void DetectRightSide()
@@ -104,10 +91,10 @@ public class Shooting : MonoBehaviour
 
         if (rightTarget != null)
         {
-            rightHandTarget.position = Vector3.Lerp(rightHandTarget.position, rightTarget.position + new Vector3(0,0.75f,0), Time.deltaTime * 10);
+            rightHandTarget.position = Vector3.Lerp(rightHandTarget.position, rightTarget.position + new Vector3(0, 0.75f, 0), Time.deltaTime * 10);
         }
     }
-    
+
     void DetectLeftSide()
     {
         Collider[] enemies = Physics.OverlapSphere(transform.position + transform.right * leftOffset + transform.forward * forwardOffset, aimRange, enemyLayerMask);
@@ -119,10 +106,10 @@ public class Shooting : MonoBehaviour
 
         if (leftTarget != null)
         {
-            leftHandTarget.position = Vector3.Lerp(leftHandTarget.position, leftTarget.position + new Vector3(0,0.75f,0), Time.deltaTime * 10);
+            leftHandTarget.position = Vector3.Lerp(leftHandTarget.position, leftTarget.position + new Vector3(0, 0.75f, 0), Time.deltaTime * 10);
         }
     }
-    
+
     void DetectCenter()
     {
         Collider[] enemies = Physics.OverlapSphere(transform.position, aimRange, enemyLayerMask);
@@ -134,10 +121,10 @@ public class Shooting : MonoBehaviour
 
         if (centerTarget != null)
         {
-            centerSpineTarget.position = Vector3.Lerp(centerSpineTarget.position, centerTarget.position + new Vector3(0,1.5f,0), Time.deltaTime * 10);
+            centerSpineTarget.position = Vector3.Lerp(centerSpineTarget.position, centerTarget.position + new Vector3(0, 0.5f, 0), Time.deltaTime * 10);
         }
     }
-    
+
 
     private float fireDelay;
     private float elaspedTime;
@@ -150,36 +137,28 @@ public class Shooting : MonoBehaviour
             Shoot();
         }
     }
-    
+
     void Shoot()
     {
-        if (leftTarget != null && PlayerController.instance.zipLiner == false)
+        if (leftTarget != null)
         {
-            gunSets[currentSelectedGunSet].Guns[0].Shoot(leftTarget,currentSelectedGunSet);
+            gunSets[currentSelectedGunSet].Guns[0].Shoot(leftTarget, currentSelectedGunSet);
         }
         if (rightTarget != null)
         {
-            gunSets[currentSelectedGunSet].Guns[1].Shoot(rightTarget,currentSelectedGunSet);
+            gunSets[currentSelectedGunSet].Guns[1].Shoot(rightTarget, currentSelectedGunSet);
         }
         if (centerTarget != null)
         {
-            gunSets[currentSelectedGunSet].Guns[0].Shoot(centerTarget,currentSelectedGunSet);
+            gunSets[currentSelectedGunSet].Guns[0].Shoot(centerTarget, currentSelectedGunSet);
         }
     }
-    
+
 
     void HandelHandAim()
     {
-        if (PlayerController.instance.zipLiner)
-        {
-            SetRightHandWeight();
-            leftHandRig.weight = 0f;
-        }
-        else
-        {
-            SetRightHandWeight();
-            SetLeftHandWeight();
-        }
+        SetRightHandWeight();
+        SetLeftHandWeight();
     }
 
     void SetRightHandWeight()
@@ -188,14 +167,14 @@ public class Shooting : MonoBehaviour
         currentRightWeight = Mathf.Lerp(currentRightWeight, targetWeight1, Time.deltaTime * 10f);
         rightHandRig.weight = currentRightWeight;
     }
-    
+
     void SetLeftHandWeight()
     {
         float targetWeight2 = leftTarget != null ? 1f : 0f;
         currentLeftWieght = Mathf.Lerp(currentLeftWieght, targetWeight2, Time.deltaTime * 10f);
         leftHandRig.weight = currentLeftWieght;
     }
-    
+
     void SetSpineWeight()
     {
         rightHandRig.weight = 0f;
@@ -204,7 +183,7 @@ public class Shooting : MonoBehaviour
         currentSpineWieght = Mathf.Lerp(currentSpineWieght, targetWeight3, Time.deltaTime * 10f);
         spineRig.weight = currentSpineWieght;
     }
-    
+
     void OnDrawGizmosSelected()
     {
         Gizmos.color = Color.cyan;
@@ -223,12 +202,24 @@ public class Shooting : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.Keypad2))
         {
             SelectGunSet(1);
+            upp.SetActive(false);
         }
-        
+
         if (Input.GetKeyDown(KeyCode.Keypad3))
         {
             SelectGunSet(2);
+            effect.SetActive(false);
         }
+        if (Input.GetKeyDown(KeyCode.Keypad4))
+        {
+            SelectGunSet(3);
+            effect.SetActive(false);
+        }
+    }
+
+    public void SwitchGun(int gunIndex)
+    {
+        SelectGunSet(gunIndex);
     }
 
     public void SelectGunSet(int gunIndex)
@@ -237,17 +228,31 @@ public class Shooting : MonoBehaviour
         if (gunIndex == 2)
         {
             hasRocketLauncher = true;
+            hasgattLauncher = false;
+            aimRange = 9;
+            rightOffset = 9;
+            leftOffset = -9;
         }
-        fireDelay = gunSets[gunIndex].Guns[gunIndex].fireRate;
+        if (gunIndex == 1)
+        {
+
+            aimRange = 9;
+            rightOffset = 9;
+            leftOffset = -9;
+        }
+        if (gunIndex == 3)
+        {
+            hasRocketLauncher = false;
+            hasgattLauncher = true;
+            aimRange = 9;
+            rightOffset = 9;
+            leftOffset = -9;
+        }
+        fireDelay = gunSets[gunIndex].Guns[0].fireRate;
         for (int i = 0; i < gunSets.Length; i++)
         {
             gunSets[i].EnableGuns(false);
         }
         gunSets[currentSelectedGunSet].EnableGuns(true);
-        if (gunIndex == 2)
-        {
-            centerTarget = new GameObject().transform;
-            gunSets[currentSelectedGunSet].Guns[0].StartSpray();
-        }
     }
 }

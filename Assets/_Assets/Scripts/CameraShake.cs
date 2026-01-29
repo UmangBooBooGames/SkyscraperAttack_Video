@@ -11,8 +11,8 @@ public class CameraShake : MonoBehaviour
 
     public Camera cam;
     [SerializeField] private CinemachineCamera virtualCamera;
-   // [SerializeField] private float shakeAmplitude = 1.5f;
-   // [SerializeField] private float shakeFrequency = 2f;
+    // [SerializeField] private float shakeAmplitude = 1.5f;
+    // [SerializeField] private float shakeFrequency = 2f;
 
     //private CinemachineBasicMultiChannelPerlin noise;
     //private float defaultAmplitude;
@@ -31,9 +31,9 @@ public class CameraShake : MonoBehaviour
         public float defaultFrequency;
         public CinemachineBasicMultiChannelPerlin noise;
     }
-    
+
     private List<CameraShakeSet> shakeSets = new List<CameraShakeSet>();
-    
+
     public bool hook1;
 
     void Awake()
@@ -45,7 +45,7 @@ public class CameraShake : MonoBehaviour
                 CinemachineCore.Stage.Noise
             ) as CinemachineBasicMultiChannelPerlin;
 
-// Safety check in case noise is null
+            // Safety check in case noise is null
             if (noise != null)
             {
                 CameraShakeSet shakeSet = new CameraShakeSet()
@@ -106,7 +106,7 @@ public class CameraShake : MonoBehaviour
     }
 
     private int previousShakeIndex;
-    public void Shake(float duration,float shakeAmplitude,float shakeFrequency,int shakeSetIndex = 0)
+    public void Shake(float duration, float shakeAmplitude, float shakeFrequency, int shakeSetIndex = 0)
     {
         if (shakeSetIndex < previousShakeIndex)
         {
@@ -119,10 +119,10 @@ public class CameraShake : MonoBehaviour
         }
         previousShakeIndex = shakeSetIndex;
         print("shake camera " + shakeSetIndex);
-        shakeCoroutine = StartCoroutine(ShakeRoutine(duration,shakeAmplitude, shakeFrequency,shakeSetIndex));
+        shakeCoroutine = StartCoroutine(ShakeRoutine(duration, shakeAmplitude, shakeFrequency, shakeSetIndex));
     }
 
-    private IEnumerator ShakeRoutine(float duration,float shakeAmplitude,float shakeFrequency,int shakeSetIndex = 0)
+    private IEnumerator ShakeRoutine(float duration, float shakeAmplitude, float shakeFrequency, int shakeSetIndex = 0)
     {
         shakeSets[shakeSetIndex].noise.AmplitudeGain = shakeAmplitude;
         shakeSets[shakeSetIndex].noise.FrequencyGain = shakeFrequency;
@@ -165,13 +165,25 @@ public class CameraShake : MonoBehaviour
         zoomin = !zoomin;
         if (zoomin)
         {
-            ChangeFov(35,1f);
+            ChangeFov(35, 1f);
         }
         else
         {
-            ChangeFov(45,1f);
+            ChangeFov(45, 1f);
         }
-       
+
+    }
+    public Money money;
+    public void InvestC(Vector3 transform, Transform posToGo, WeaponDropEffect de)
+    {
+        GameObject Go = Instantiate(money.gameObject, transform, Quaternion.identity);
+        Go.GetComponent<Money>().canTake = true;
+        Go.GetComponent<Money>().unlockPlace = posToGo;
+        Go.GetComponent<Money>().dropEffect = de;
+
+        Go.GetComponent<Money>().InC(posToGo);
+
+        Go.transform.DOScale(Go.transform.localScale * 1.2f, .2f).SetEase(Ease.InOutBack);
     }
 }
 
